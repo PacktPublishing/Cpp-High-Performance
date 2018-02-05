@@ -1,0 +1,53 @@
+/// \file
+// Range v3 library
+//
+//  Copyright Eric Niebler 2013-2015
+//
+//  Use, modification and distribution is subject to the
+//  Boost Software License, Version 1.0. (See accompanying
+//  file LICENSE_1_0.txt or copy at
+//  http://www.boost.org/LICENSE_1_0.txt)
+//
+// Project home: https://github.com/ericniebler/range-v3
+
+#ifndef RANGES_V3_UTILITY_TAGGED_TUPLE_HPP
+#define RANGES_V3_UTILITY_TAGGED_TUPLE_HPP
+
+#include <tuple>
+#include <utility>
+#include <functional>
+#include <meta/meta.hpp>
+#include <range/v3/range_fwd.hpp>
+#include <range/v3/utility/tagged_pair.hpp>
+
+namespace ranges
+{
+    inline namespace v3
+    {
+        template<typename... Ts>
+        using tagged_tuple =
+            tagged<std::tuple<detail::tag_elem<Ts>...>, detail::tag_spec<Ts>...>;
+
+#ifdef RANGES_WORKAROUND_MSVC_PACK_EXPANSION
+        template<typename Tag, typename T>
+        struct tagged_tuple_helper {
+            using type = Tag(bind_element_t<T>);
+        };
+        template<typename...Tags, typename...Ts>
+        constexpr tagged_tuple<typename tagged_tuple_helper<Tags, Ts>::type...>
+#else
+        template<typename...Tags, typename...Ts>
+        constexpr tagged_tuple<Tags(bind_element_t<Ts>)...>
+#endif
+        make_tagged_tuple(Ts &&... ts)
+        {
+#ifdef RANGES_WORKAROUND_MSVC_PACK_EXPANSION
+            return tagged_tuple<typename tagged_tuple_helper<Tags, Ts>::type...>{detail::forward<Ts>(ts)...};
+#else
+            return tagged_tuple<Tags(bind_element_t<Ts>)...>{detail::forward<Ts>(ts)...};
+#endif
+        }
+    }
+}
+
+#endif

@@ -1,0 +1,133 @@
+/// \file
+// Range v3 library
+//
+//  Copyright Eric Niebler 2013-2014
+//
+//  Use, modification and distribution is subject to the
+//  Boost Software License, Version 1.0. (See accompanying
+//  file LICENSE_1_0.txt or copy at
+//  http://www.boost.org/LICENSE_1_0.txt)
+//
+// Project home: https://github.com/ericniebler/range-v3
+//
+
+#ifndef RANGES_V3_ACTION_PUSH_BACK_HPP
+#define RANGES_V3_ACTION_PUSH_BACK_HPP
+
+#include <utility>
+#include <meta/meta.hpp>
+#include <range/v3/range_fwd.hpp>
+#include <range/v3/utility/functional.hpp>
+#include <range/v3/action/insert.hpp>
+#include <range/v3/action/action.hpp>
+#include <range/v3/utility/static_const.hpp>
+
+namespace ranges
+{
+    inline namespace v3
+    {
+        /// \cond
+        namespace adl_push_back_detail
+        {
+            template<typename Cont, typename T,
+#ifdef RANGES_WORKAROUND_MSVC_SFINAE_CONSTEXPR
+                CONCEPT_REQUIRES_(LvalueContainerLike<Cont>::value && Constructible<range_value_t<Cont>, T &&>::value)>
+#else
+                CONCEPT_REQUIRES_(LvalueContainerLike<Cont>() && Constructible<range_value_t<Cont>, T &&>())>
+#endif
+            auto push_back(Cont && cont, T && t) ->
+                decltype((void)unwrap_reference(cont).push_back(std::forward<T>(t)))
+            {
+                unwrap_reference(cont).push_back(std::forward<T>(t));
+            }
+
+            template<typename Cont, typename Rng,
+#ifdef RANGES_WORKAROUND_MSVC_SFINAE_CONSTEXPR
+                CONCEPT_REQUIRES_(LvalueContainerLike<Cont>::value && Range<Rng>::value)>
+#else
+                CONCEPT_REQUIRES_(LvalueContainerLike<Cont>() && Range<Rng>())>
+#endif
+            auto push_back(Cont && cont, Rng && rng) ->
+                decltype((void)ranges::insert(unwrap_reference(cont), end(cont), std::forward<Rng>(rng)))
+            {
+                ranges::insert(unwrap_reference(cont), end(cont), std::forward<Rng>(rng));
+            }
+
+            struct push_back_fn
+            {
+            private:
+                friend action::action_access;
+                template<typename T>
+                static auto bind(push_back_fn push_back, T && val)
+                RANGES_DECLTYPE_AUTO_RETURN
+                (
+                    std::bind(push_back, std::placeholders::_1, bind_forward<T>(val))
+                )
+            public:
+                struct ConceptImpl
+                {
+                    template<typename Rng, typename T>
+                    auto requires_(Rng&& rng, T&&) -> decltype(
+                        concepts::valid_expr(
+                            concepts::model_of<concepts::InputRange, Rng>(),
+                            concepts::is_true(meta::or_<
+                                Constructible<range_value_t<Rng>, T &&>,
+                                Range<T &&>>()),
+                            (push_back(rng, concepts::val<T>()), 42)
+                        ));
+                };
+
+                template<typename Rng, typename Fun>
+                using Concept = concepts::models<ConceptImpl, Rng, Fun>;
+
+                template<typename Rng, typename T,
+#ifdef RANGES_WORKAROUND_MSVC_SFINAE_CONSTEXPR
+                    CONCEPT_REQUIRES_(Concept<Rng, T>::value)>
+#else
+                    CONCEPT_REQUIRES_(Concept<Rng, T>())>
+#endif
+                Rng operator()(Rng && rng, T && t) const
+                {
+                    push_back(rng, std::forward<T>(t));
+                    return std::forward<Rng>(rng);
+                }
+
+            #ifndef RANGES_DOXYGEN_INVOKED
+                template<typename Rng, typename T,
+#ifdef RANGES_WORKAROUND_MSVC_SFINAE_CONSTEXPR
+                    CONCEPT_REQUIRES_(!Concept<Rng, T>::value)>
+#else
+                    CONCEPT_REQUIRES_(!Concept<Rng, T>())>
+#endif
+                void operator()(Rng &&, T &&) const
+                {
+                    CONCEPT_ASSERT_MSG(InputRange<Rng>(),
+                        "The object on which action::push_back operates must be a model of the "
+                        "InputRange concept.");
+                    CONCEPT_ASSERT_MSG(meta::or_<
+                        Constructible<range_value_t<Rng>, T &&>,
+                        Range<T &&>>(),
+                        "The object to be inserted with action::push_back must either be "
+                        "convertible to the range's value type, or else it must be a range "
+                        "of elements that are convertible to the range's value type.");
+                }
+            #endif
+            };
+        }
+        /// \endcond
+
+        namespace action
+        {
+            /// \ingroup group-actions
+            /// \sa with_braced_init_args
+            namespace
+            {
+                constexpr auto&& push_back = static_const<with_braced_init_args<action<adl_push_back_detail::push_back_fn>>>::value;
+            }
+        }
+
+        using action::push_back;
+    }
+}
+
+#endif

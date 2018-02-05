@@ -1,0 +1,267 @@
+/// \file
+// Range v3 library
+//
+//  Copyright Eric Niebler 2013-2014
+//
+//  Use, modification and distribution is subject to the
+//  Boost Software License, Version 1.0. (See accompanying
+//  file LICENSE_1_0.txt or copy at
+//  http://www.boost.org/LICENSE_1_0.txt)
+//
+// Project home: https://github.com/ericniebler/range-v3
+//
+
+#ifndef RANGES_V3_UTILITY_BOX_HPP
+#define RANGES_V3_UTILITY_BOX_HPP
+
+#include <atomic>
+#include <utility>
+#include <cstdlib>
+#include <type_traits>
+#include <range/v3/range_fwd.hpp>
+#include <range/v3/utility/get.hpp>
+#include <range/v3/utility/concepts.hpp>
+
+namespace ranges
+{
+    inline namespace v3
+    {
+        /// \addtogroup group-utility Utility
+        /// @{
+        ///
+        template<typename T>
+        struct mutable_
+        {
+            mutable T value;
+#ifdef RANGES_WORKAROUND_MSVC_SFINAE_CONSTEXPR
+            CONCEPT_REQUIRES(DefaultConstructible<T>::value)
+#else
+            CONCEPT_REQUIRES(DefaultConstructible<T>())
+#endif
+            constexpr mutable_()
+              : value{}
+            {}
+            constexpr explicit mutable_(T const &t)
+              : value(t)
+            {}
+            constexpr explicit mutable_(T &&t)
+              : value(detail::move(t))
+            {}
+            mutable_ const &operator=(T const &t) const
+            {
+                value = t;
+                return *this;
+            }
+            mutable_ const &operator=(T &&t) const
+            {
+                value = detail::move(t);
+                return *this;
+            }
+            constexpr operator T &() const &
+            {
+                return value;
+            }
+        };
+
+        template<typename T>
+        struct mutable_<std::atomic<T>>
+        {
+            mutable std::atomic<T> value;
+            mutable_() = default;
+            mutable_(mutable_ const &that)
+              : value(static_cast<T>(that.value))
+            {}
+            constexpr explicit mutable_(T &&t)
+              : value(detail::move(t))
+            {}
+            constexpr explicit mutable_(T const &t)
+              : value(t)
+            {}
+            mutable_ const &operator=(mutable_ const &that) const
+            {
+                value = static_cast<T>(that.value);
+                return *this;
+            }
+            mutable_ const &operator=(T &&t) const
+            {
+                value = std::move(t);
+                return *this;
+            }
+            mutable_ const &operator=(T const &t) const
+            {
+                value = t;
+                return *this;
+            }
+            operator T() const
+            {
+                return value;
+            }
+            T exchange(T desired)
+            {
+                return value.exchange(desired);
+            }
+            operator std::atomic<T> &() const &
+            {
+                return value;
+            }
+        };
+
+        template<typename T, T v>
+        struct constant
+        {
+            constant() = default;
+            constexpr explicit constant(T const &)
+            {}
+            constant &operator=(T const &)
+            {
+                return *this;
+            }
+            constant const &operator=(T const &) const
+            {
+                return *this;
+            }
+            constexpr operator T() const
+            {
+                return v;
+            }
+            constexpr T exchange(T const &) const
+            {
+                return v;
+            }
+        };
+
+        static_assert(std::is_trivial<constant<int, 0>>::value, "Expected constant to be trivial");
+
+        template<typename Element, typename Tag = Element,
+            bool Empty = std::is_empty<Element>::value &&
+#if RANGES_CXX_LIB_IS_FINAL >= RANGES_CXX_LIB_IS_FINAL_14
+                         !std::is_final<Element>::value>
+#else
+                         true>
+#endif
+        struct box
+        {
+            Element value;
+
+#ifdef RANGES_WORKAROUND_MSVC_SFINAE_CONSTEXPR
+            CONCEPT_REQUIRES(DefaultConstructible<Element>::value)
+#else
+            CONCEPT_REQUIRES(DefaultConstructible<Element>())
+#endif
+            constexpr box()
+              : value{}
+            {}
+
+            template<typename E,
+#ifdef RANGES_WORKAROUND_MSVC_SFINAE_CONSTEXPR
+                CONCEPT_REQUIRES_(Constructible<Element, E &&>::value)>
+#else
+                CONCEPT_REQUIRES_(Constructible<Element, E &&>())>
+#endif
+            constexpr explicit box(E && e)
+              : value(detail::forward<E>(e))
+            {}
+        };
+
+        template<typename Element, typename Tag>
+        struct box<Element, Tag, true>
+          : Element
+        {
+#ifdef RANGES_WORKAROUND_MSVC_SFINAE_CONSTEXPR
+            CONCEPT_REQUIRES(DefaultConstructible<Element>::value)
+#else
+            CONCEPT_REQUIRES(DefaultConstructible<Element>())
+#endif
+            constexpr box()
+              : Element{}
+            {}
+
+            template<typename E,
+#ifdef RANGES_WORKAROUND_MSVC_SFINAE_CONSTEXPR
+                CONCEPT_REQUIRES_(Constructible<Element, E &&>::value)>
+#else
+                CONCEPT_REQUIRES_(Constructible<Element, E &&>())>
+#endif
+            constexpr explicit box(E && e)
+              : Element(detail::forward<E>(e))
+            {}
+        };
+
+        // Get by tag type
+        template<typename Tag, typename Element>
+        constexpr Element & get(box<Element, Tag, false> & b)
+        {
+            return b.value;
+        }
+
+        template<typename Tag, typename Element>
+        constexpr Element const & get(box<Element, Tag, false> const & b)
+        {
+            return b.value;
+        }
+
+        template<typename Tag, typename Element>
+        constexpr Element && get(box<Element, Tag, false> && b)
+        {
+            return detail::move(b).value;
+        }
+
+        template<typename Tag, typename Element>
+        constexpr Element & get(box<Element, Tag, true> & b)
+        {
+            return b;
+        }
+
+        template<typename Tag, typename Element>
+        constexpr Element const & get(box<Element, Tag, true> const & b)
+        {
+            return b;
+        }
+
+        template<typename Tag, typename Element>
+        constexpr Element && get(box<Element, Tag, true> && b)
+        {
+            return detail::move(b);
+        }
+
+        // Get by index
+        template<std::size_t I, typename Element>
+        constexpr Element & get(box<Element, std::integral_constant<std::size_t, I>, false> & b)
+        {
+            return b.value;
+        }
+
+        template<std::size_t I, typename Element>
+        constexpr Element const & get(box<Element, std::integral_constant<std::size_t, I>, false> const & b)
+        {
+            return b.value;
+        }
+
+        template<std::size_t I, typename Element>
+        constexpr Element && get(box<Element, std::integral_constant<std::size_t, I>, false> && b)
+        {
+            return detail::move(b).value;
+        }
+
+        template<std::size_t I, typename Element>
+        constexpr Element & get(box<Element, std::integral_constant<std::size_t, I>, true> & b)
+        {
+            return b;
+        }
+
+        template<std::size_t I, typename Element>
+        constexpr Element const & get(box<Element, std::integral_constant<std::size_t, I>, true> const & b)
+        {
+            return b;
+        }
+
+        template<std::size_t I, typename Element>
+        constexpr Element && get(box<Element, std::integral_constant<std::size_t, I>, true> && b)
+        {
+            return detail::move(b);
+        }
+        /// @}
+    }
+}
+
+#endif

@@ -1,0 +1,80 @@
+/// \file
+// Range v3 library
+//
+//  Copyright Eric Niebler 2013-2014
+//
+//  Use, modification and distribution is subject to the
+//  Boost Software License, Version 1.0. (See accompanying
+//  file LICENSE_1_0.txt or copy at
+//  http://www.boost.org/LICENSE_1_0.txt)
+//
+// Project home: https://github.com/ericniebler/range-v3
+//
+
+#ifndef RANGES_V3_VIEW_UNIQUE_HPP
+#define RANGES_V3_VIEW_UNIQUE_HPP
+
+#include <utility>
+#include <meta/meta.hpp>
+#include <range/v3/range_fwd.hpp>
+#include <range/v3/utility/functional.hpp>
+#include <range/v3/utility/static_const.hpp>
+#include <range/v3/view/adjacent_remove_if.hpp>
+#include <range/v3/view/view.hpp>
+#include <range/v3/view/all.hpp>
+
+namespace ranges
+{
+    inline namespace v3
+    {
+        /// \addtogroup group-views
+        /// @{
+        namespace view
+        {
+            struct unique_fn
+            {
+                template<typename Rng>
+                using Concept = meta::and_<
+                    ForwardRange<Rng>,
+                    EqualityComparable<range_value_t<Rng>>>;
+
+#ifdef RANGES_WORKAROUND_MSVC_SFINAE_CONSTEXPR
+                template<typename Rng, CONCEPT_REQUIRES_(Concept<Rng>::value)>
+#else
+                template<typename Rng, CONCEPT_REQUIRES_(Concept<Rng>())>
+#endif
+                unique_view<all_t<Rng>> operator()(Rng && rng) const
+                {
+                    return {all(std::forward<Rng>(rng)), equal_to{}};
+                }
+            #ifndef RANGES_DOXYGEN_INVOKED
+                template<typename Rng,
+#ifdef RANGES_WORKAROUND_MSVC_SFINAE_CONSTEXPR
+                    CONCEPT_REQUIRES_(!Concept<Rng>::value)>
+#else
+                    CONCEPT_REQUIRES_(!Concept<Rng>())>
+#endif
+                void operator()(Rng &&) const
+                {
+                    CONCEPT_ASSERT_MSG(ForwardRange<Rng>(),
+                        "The object on which view::unique operates must be a model the "
+                        "ForwardRange concept.");
+                    CONCEPT_ASSERT_MSG(EqualityComparable<range_value_t<Rng>>(),
+                        "The value type of the range passed to view::unique must be "
+                        "EqualityComparable.");
+                }
+            #endif
+            };
+
+            /// \relates unique_fn
+            /// \ingroup group-views
+            namespace
+            {
+                constexpr auto&& unique = static_const<view<unique_fn>>::value;
+            }
+        }
+        /// @}
+    }
+}
+
+#endif
