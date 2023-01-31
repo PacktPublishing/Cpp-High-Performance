@@ -104,6 +104,23 @@ Assuming you have Xcode correctly installed, you can open the project by this co
 ```
 $ open xcode-build/CppHighPerformanceCodeExamples.xcodeproj
 ```
+// Xcode and Xcode Command Line Tools are only accessible through this method via Mac and other iOS Devices.
+INSTALATION OF XCODE :-
+
+Access your Mac’s Terminal Application or what’s otherwise referred to as the Console; anything typed into this terminal is sent straight to your device’s Operating System:
+
+Press “Command + Spacebar” to access Spotlight Search;
+Type in the word “Terminal” into the Spotlight search field and hit “Enter”; this should execute your Mac’s Terminal app;
+Type “gcc” into the terminal and hit “Enter” (gcc is a compiler that turns source code into executable applications). Alternatively, typing “xcode-select — install” into the terminal works just as well. Before installing Xcode Command Line Tools, click “Get Xcode”;
+In order to install Xcode from the App Store, you’ll need to first log-in through your Apple Id. If you haven’t already created one, you can do so by clicking here.
+
+REMEMBER ALWAYS THAT The installation may not initiate until you’ve completed particular software updates. To check, click the Updates tab and select Update All
+
+To monitor the installation’s progress, open Spotlight Search by pressing “Command + Spacebar” and type in/open up Launchpad.
+AND ALSO REMEMBER THAT 
+NOTE: the installation may not initiate until you’ve completed particular software updates. To check, click the Updates tab and select Update All
+
+To monitor the installation’s progress, open Spotlight Search by pressing “Command + Spacebar” and type in/open up Launchpad.
 
 ### Build the source code
 Now you are ready to compile the example codes using the makefiles (or Xcode) generated in the `build` directory. First `cd` into the build directory:
